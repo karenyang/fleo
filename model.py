@@ -169,9 +169,17 @@ class LEO(snt.AbstractModule):
 
   @snt.reuse_variables
   def forward_encoder(self, data):
+    """
+    TODO  @Karen@Todd
+    Add a couple flow transformation here to increase the expressiveness of the posterior inference p(z|x)
+    """
     encoder_outputs = self.encoder(data.tr_input)
+    """
+    put Flow layers here (or shall we do it after the relation networks? 
+    """
     relation_network_outputs = self.relation_network(encoder_outputs)
     latent_dist_params = self.average_codes_per_class(relation_network_outputs)
+
     latents, kl = self.possibly_sample(latent_dist_params)
     return latents, kl
 
@@ -205,6 +213,10 @@ class LEO(snt.AbstractModule):
 
   @snt.reuse_variables
   def relation_network(self, inputs):
+    """
+    TODO @Karen @Todd
+    Change this Relation Network change to something more like cluster-based ProtoNet
+    """
     with tf.variable_scope("relation_network"):
       regularizer = tf.contrib.layers.l2_regularizer(self._l2_penalty_weight)
       initializer = tf.initializers.glorot_uniform(dtype=self._float_dtype)
@@ -254,6 +266,10 @@ class LEO(snt.AbstractModule):
     return codes
 
   def possibly_sample(self, distribution_params, stddev_offset=0.):
+    """
+    TODO @Karen @Todd
+    Change sampling to potentially mixture of Gaussian (not necessarily if we use flow based models)
+    """
     means, unnormalized_stddev = tf.split(distribution_params, 2, axis=-1)
     stddev = tf.exp(unnormalized_stddev)
     stddev -= (1. - stddev_offset)
@@ -315,6 +331,11 @@ class LEO(snt.AbstractModule):
     return self._dropout_rate if self.is_meta_training else 0.0
 
   def loss_fn(self, model_outputs, original_classes):
+    """
+    TODO @Karen @Todd
+    Consider mutual information term to enforce larger correlation between z and phi
+    Might need a hyperparameter beta to determine the weight of mutual information term. As in beta-VAE
+    """
     original_classes = tf.squeeze(original_classes, axis=-1)
     # Tensorflow doesn't handle second order gradients of a sparse_softmax yet.
     one_hot_outputs = tf.one_hot(original_classes, depth=self.num_classes)
