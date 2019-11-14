@@ -186,9 +186,11 @@ def run_training_loop(checkpoint_path):
 
         _, global_step_ev, metatrain_accuracy_ev = sess.run(
             [train_op, global_step, metatrain_accuracy])
+
         if global_step_ev % (FLAGS.checkpoint_steps // 2) == 0:
           tf.logging.info("Step: {} meta-train accuracy: {}".format(
               global_step_ev, metatrain_accuracy_ev))
+        global_step_ev += 1
     else:
       assert not FLAGS.checkpoint_steps
       num_metatest_estimates = (
