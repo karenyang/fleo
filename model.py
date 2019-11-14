@@ -111,8 +111,8 @@ class LEO(snt.AbstractModule):
         self.is_meta_training = is_meta_training
         self.save_problem_instance_stats(data.tr_input)
 
-        latents, kl = self.forward_encoder(data)
-        tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
+        latents, kl, z_entropy = self.forward_encoder(data)
+        tr_loss, adapted_classifier_weights, encoder_penalty, decoder_entropy = self.leo_inner_loop(
             data, latents)
 
         val_loss, val_accuracy = self.finetuning_inner_loop(
@@ -120,6 +120,14 @@ class LEO(snt.AbstractModule):
 
         val_loss += self._kl_weight * kl
         val_loss += self._encoder_penalty_weight * encoder_penalty
+
+        """
+        Mutual Information term added in the loss function
+        """
+        if z_entropy is not None and decoder_entropy is not None:
+            mi = z_entropy - decoder_entropy
+            val_loss -= self._mi_weight * mi
+
         # The l2 regularization is is already added to the graph when constructing
         # the snt.Linear modules. We pass the orthogonality regularizer separately,
         # because it is not used in self.grads_and_vars.
@@ -143,7 +151,7 @@ class LEO(snt.AbstractModule):
         for _ in range(self._inner_unroll_length):
             loss_grad = tf.gradients(loss, latents)  # dLtrain/dz
             latents -= inner_lr * loss_grad[0]
-            loss, classifier_weights = self.forward_decoder(data, latents)
+            loss, classifier_weights, decoder_entropy = self.forward_decoder(data, latents)
 
         if self.is_meta_training:
             encoder_penalty = tf.losses.mean_squared_error(
@@ -152,7 +160,7 @@ class LEO(snt.AbstractModule):
         else:
             encoder_penalty = tf.constant(0., self._float_dtype)
 
-        return loss, classifier_weights, encoder_penalty
+        return loss, classifier_weights, encoder_penalty, decoder_entropy
 
     @snt.reuse_variables
     def finetuning_inner_loop(self, data, leo_loss, classifier_weights):
@@ -183,12 +191,12 @@ class LEO(snt.AbstractModule):
         latent_dist_params = self.average_codes_per_class(relation_network_outputs)
 
         # latents, kl = self.possibly_sample(latent_dist_params) # original
-        latents, kl = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
+        latents, kl, z_entropy = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
 
-        return latents, kl
+        return latents, kl, z_entropy
 
     @snt.reuse_variables
-    def forward_decoder(self, data, latents):
+    def forward_decoder(self, data, latents, z_entropy=None):
         weights_dist_params = self.decoder(latents)
         # Default to glorot_initialization and not stddev=1.
         fan_in = self.embedding_dim.value
@@ -198,7 +206,9 @@ class LEO(snt.AbstractModule):
                                                      stddev_offset=stddev_offset)
         tr_loss, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
                                                classifier_weights)
-        return tr_loss, classifier_weights
+        # get the entropy of the decoder output -- distribution of x|z, where x is the task specific params's dist. 
+        decoder_entropy = weights_dist_params.entropy()
+        return tr_loss, classifier_weights, decoder_entropy
 
     @snt.reuse_variables
     def encoder(self, inputs):
@@ -269,9 +279,12 @@ class LEO(snt.AbstractModule):
         codes = tf.tile(codes, [1, self.num_examples_per_class, 1])
         return codes
 
-    def maf_flow(self, z_dist, latent_size, n_flows, hidden_size=(512, 512), invert=False):
-        def init_once(x, name):
-            return tf.get_variable(name, initializer=x, trainable=False)
+    def maf_flow(self, z_dist, latent_size, n_flows, hidden_size=(512, 512), invert=False, prior=False):
+        def init_once(x, name, prior):
+            if prior:
+                return tf.get_variable(name+"_prior", initializer=x, trainable=False)
+            else:
+                return tf.get_variable(name, initializer=x, trainable=False)
 
         chain = list(
             itertools.chain.from_iterable(
@@ -281,19 +294,27 @@ class LEO(snt.AbstractModule):
                             hidden_size)),
                     tfb.Permute(
                         init_once(np.random.permutation(latent_size.value),
-                                  'permute_%d' % i)),
+                                  'permute_%d' % i, prior=prior),)
                 ] for i in range(n_flows)))
         return tfd.TransformedDistribution(distribution=z_dist, bijector=tfb.Chain(chain[:-1]))
 
     def maf_kl_divergence(self, samples, distribution, n_flows):
+        """
+        Calculate KL divergence with MAF prior
+        :param samples:
+        :param distribution:
+        :param n_flows:
+        :return:
+        """
         latent_size = samples.shape[-1]
         maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
             loc=tf.zeros([latent_size], dtype=tf.float32),
             scale_diag=tf.ones([latent_size], dtype=tf.float32)),
-            latent_size, n_flows)
+            latent_size, n_flows, prior=True)
+        z_entropy = maf_latent_prior.entropy()
         kl = tf.reduce_mean(
             distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
-        return kl
+        return kl, z_entropy
 
     def possibly_sample_maf(self, distribution_params, stddev_offset=0., n_flows=3):
         """
@@ -306,10 +327,19 @@ class LEO(snt.AbstractModule):
         stddev = tf.maximum(stddev, 1e-10)
         if not self.is_meta_training:
             return means, tf.constant(0., dtype=self._float_dtype)
-        distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)
+        # distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)
+        # pass the means and variance from encoder through Flow transformation
+        distribution = self.maf_flow(
+            tfd.MultivariateNormalDiag(
+                loc=means,
+                scale_diag=stddev),
+            latent_size=means.shape[-1],
+            n_flows=n_flows
+        )
+
         samples = distribution.sample()
-        kl_divergence = self.maf_kl_divergence(samples, distribution, n_flows)
-        return samples, kl_divergence
+        kl_divergence, z_entropy = self.maf_kl_divergence(samples, distribution, n_flows)
+        return samples, kl_divergence, z_entropy
 
     def possibly_sample(self, distribution_params, stddev_offset=0.):
         means, unnormalized_stddev = tf.split(distribution_params, 2, axis=-1)
@@ -320,15 +350,16 @@ class LEO(snt.AbstractModule):
         if not self.is_meta_training:
             return means, tf.constant(0., dtype=self._float_dtype)
         samples = distribution.sample()
-        kl_divergence = self.kl_divergence(samples, distribution)
-        return samples, kl_divergence
+        kl_divergence,z_entropy = self.kl_divergence(samples, distribution)
+        return samples, kl_divergence,z_entropy
 
     def kl_divergence(self, samples, distribution):
         random_prior = tfd.Normal(
             loc=tf.zeros_like(samples), scale=tf.ones_like(samples))
         kl = tf.reduce_mean(
             distribution.log_prob(samples) - random_prior.log_prob(samples))
-        return kl
+        z_entropy = random_prior.entropy()
+        return kl,z_entropy
 
     def predict(self, inputs, weights):
         after_dropout = tf.nn.dropout(inputs, rate=self.dropout_rate)
