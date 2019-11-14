@@ -120,6 +120,7 @@ class LEO(snt.AbstractModule):
 
         val_loss += self._kl_weight * kl
         val_loss += self._encoder_penalty_weight * encoder_penalty
+
         # The l2 regularization is is already added to the graph when constructing
         # the snt.Linear modules. We pass the orthogonality regularizer separately,
         # because it is not used in self.grads_and_vars.
@@ -269,9 +270,12 @@ class LEO(snt.AbstractModule):
         codes = tf.tile(codes, [1, self.num_examples_per_class, 1])
         return codes
 
-    def maf_flow(self, z_dist, latent_size, n_flows, hidden_size=(512, 512), invert=False):
-        def init_once(x, name):
-            return tf.get_variable(name, initializer=x, trainable=False)
+    def maf_flow(self, z_dist, latent_size, n_flows, hidden_size=(512, 512), invert=False, prior=False):
+        def init_once(x, name, prior):
+            if prior:
+                return tf.get_variable(name + "_prior", initializer=x, trainable=False)
+            else:
+                return tf.get_variable(name, initializer=x, trainable=False)
 
         chain = list(
             itertools.chain.from_iterable(
@@ -281,16 +285,23 @@ class LEO(snt.AbstractModule):
                             hidden_size)),
                     tfb.Permute(
                         init_once(np.random.permutation(latent_size.value),
-                                  'permute_%d' % i)),
+                                  'permute_%d' % i, prior=prior), )
                 ] for i in range(n_flows)))
         return tfd.TransformedDistribution(distribution=z_dist, bijector=tfb.Chain(chain[:-1]))
 
     def maf_kl_divergence(self, samples, distribution, n_flows):
+        """
+        Calculate KL divergence with MAF prior
+        :param samples:
+        :param distribution:
+        :param n_flows:
+        :return:
+        """
         latent_size = samples.shape[-1]
         maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
             loc=tf.zeros([latent_size], dtype=tf.float32),
             scale_diag=tf.ones([latent_size], dtype=tf.float32)),
-            latent_size, n_flows)
+            latent_size, n_flows, prior=True)
         kl = tf.reduce_mean(
             distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
         return kl
@@ -306,7 +317,16 @@ class LEO(snt.AbstractModule):
         stddev = tf.maximum(stddev, 1e-10)
         if not self.is_meta_training:
             return means, tf.constant(0., dtype=self._float_dtype)
-        distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)
+        # distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)
+        # pass the means and variance from encoder through Flow transformation
+        distribution = self.maf_flow(
+            tfd.MultivariateNormalDiag(
+                loc=means,
+                scale_diag=stddev),
+            latent_size=means.shape[-1],
+            n_flows=n_flows
+        )
+
         samples = distribution.sample()
         kl_divergence = self.maf_kl_divergence(samples, distribution, n_flows)
         return samples, kl_divergence
