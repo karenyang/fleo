@@ -90,6 +90,7 @@ flags.DEFINE_float(
     "gradient_norm_threshold", 0.1, "The cutoff for clipping of "
                                     "the gradient norm. Gradient norm clipping will be applied "
                                     "after pointwise clipping (described above).")
+flags.DEFINE_integer("num_MAF_layers", 3, "layers to use fpr MAF after encoder")
 
 
 def get_data_config():
@@ -115,6 +116,7 @@ def get_inner_model_config():
     config["encoder_penalty_weight"] = FLAGS.encoder_penalty_weight
     config["l2_penalty_weight"] = FLAGS.l2_penalty_weight
     config["orthogonality_penalty_weight"] = FLAGS.orthogonality_penalty_weight
+    config['num_MAF_layers'] = FLAGS.num_MAF_layers
 
     return config
 

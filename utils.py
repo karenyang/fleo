@@ -27,7 +27,6 @@ import tensorflow as tf
 import config
 import data
 
-
 def unpack_data(problem_instance):
     """Map data.ProblemInstance to a list of Tensors, to process with map_fn."""
     if isinstance(problem_instance, data.ProblemInstance):
@@ -104,6 +103,9 @@ def _is_previous_accuracy_better(best_checkpoint_path, accuracy):
 
 
 def evaluate_and_average(session, tensor, num_estimates):
-    tensor_value_estimates = [session.run(tensor) for _ in range(num_estimates)]
+    tensor_value_estimates = []
+    for i in range(num_estimates):
+        tensor_value_estimates.append(session.run(tensor))
+        print(i, tensor_value_estimates[-1])
     average_tensor_value = sum(tensor_value_estimates) / num_estimates
     return average_tensor_value
