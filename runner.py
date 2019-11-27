@@ -28,6 +28,7 @@ import tensorflow as tf
 
 import config
 import data
+import toy_data
 import model
 import utils
 
@@ -39,6 +40,7 @@ flags.DEFINE_integer(
     "steps, of saving the checkpoints.")
 flags.DEFINE_boolean("evaluation_mode", False, "Whether to run in an "
                      "evaluation-only mode.")
+flags.DEFINE_boolean("toy_dataset", False, "Use toy dataset instead of normal dataset")
 
 
 def _clip_gradients(gradients, gradient_threshold, gradient_norm_threshold):
@@ -75,7 +77,10 @@ def _construct_training_summaries(metatrain_loss, metatrain_accuracy,
 def _construct_examples_batch(batch_size, split, num_classes,
                               num_tr_examples_per_class,
                               num_val_examples_per_class):
-  data_provider = data.DataProvider(split, config.get_data_config())
+  if FLAGS.toy_dataset:
+      data_provider = toy_data.DataProvider(split)
+  else:
+      data_provider = data.DataProvider(split, config.get_data_config())
   examples_batch = data_provider.get_batch(batch_size, num_classes,
                                            num_tr_examples_per_class,
                                            num_val_examples_per_class)
