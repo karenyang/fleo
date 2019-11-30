@@ -1,5 +1,5 @@
 import pandas as pd
-import tf
+import tensorflow as tf
 import collections
 import random
 
@@ -22,7 +22,7 @@ class DataProvider(object):
         # todo: get dataset split
         # todo: ensure meta_split vs inner_loop_split
 
-        def get_instance(self, num_classes, tr_size, val_size):
+    def get_instance(self, num_classes, tr_size, val_size):
             """Samples a random N-way K-shot classification problem instance.
             Args:
               num_classes: N in N-way classification.

@@ -54,7 +54,7 @@ def create_dataset(save_path):
         image_embeddings += sampler.sample_batch(SAMPLES_PER_CLASS)
         labels += [i] * SAMPLES_PER_CLASS
 
-    df = pd.Dataframe(list(zip(image_embeddings, labels)), columns=["image_embedding", "class_id"])
+    df = pd.DataFrame(list(zip(image_embeddings, labels)), columns=["image_embedding", "class_id"])
     df.to_csv(save_path)
 
 

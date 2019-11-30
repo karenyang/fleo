@@ -77,9 +77,11 @@ def _construct_training_summaries(metatrain_loss, metatrain_accuracy,
 def _construct_examples_batch(batch_size, split, num_classes,
                               num_tr_examples_per_class,
                               num_val_examples_per_class):
-  if FLAGS.toy_dataset:
+  if True or FLAGS.toy_dataset:  # todo: fix. temporarily added as true
+      print("using toy dataset")
       data_provider = toy_data.DataProvider(split)
   else:
+      print("using normal dataset")
       data_provider = data.DataProvider(split, config.get_data_config())
   examples_batch = data_provider.get_batch(batch_size, num_classes,
                                            num_tr_examples_per_class,
