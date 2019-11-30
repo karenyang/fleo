@@ -109,7 +109,6 @@ class LEO(snt.AbstractModule):
     latents, kl = self.forward_encoder(data)
     tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
         data, latents)
-
     val_loss, val_accuracy = self.finetuning_inner_loop(
         data, tr_loss, adapted_classifier_weights)
 
@@ -288,6 +287,7 @@ class LEO(snt.AbstractModule):
     model_outputs = self.predict(inputs, classifier_weights)
     model_predictions = tf.argmax(
         model_outputs, -1, output_type=self._int_dtype)
+#    import pdb; pdb.set_trace() 
     accuracy = tf.contrib.metrics.accuracy(model_predictions,
                                            tf.squeeze(true_outputs, axis=-1))
 

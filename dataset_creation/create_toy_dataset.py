@@ -6,7 +6,7 @@ import numpy as np
 
 STDEV_NOISE = 0.3  # Standard deviation of gaussian noise
 NUM_CLASSES = 100
-SAMPLES_PER_CLASS = 50
+SAMPLES_PER_CLASS = 5000
 
 
 class RandomLine:
@@ -58,7 +58,7 @@ def create_dataset(save_path):
     df.to_csv(save_path)
 
 
-create_dataset("test.csv")
+create_dataset("toy_dataset.csv")
 
 
 
