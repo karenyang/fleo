@@ -79,6 +79,7 @@ class LEO(snt.AbstractModule):
         self._l2_penalty_weight = config["l2_penalty_weight"]  # lambda_1
         # lambda_2
         self._orthogonality_penalty_weight = config["orthogonality_penalty_weight"]
+        self.num_MAF_layers = config['num_MAF_layers']
 
         assert self._inner_unroll_length > 0, ("Positive unroll length is necessary"
                                                " to create the graph")
@@ -111,15 +112,18 @@ class LEO(snt.AbstractModule):
         self.is_meta_training = is_meta_training
         self.save_problem_instance_stats(data.tr_input)
 
+
+        #before inner gradient update. tr_loss is the initial classifier loss using the theta (sampled from decoder output)
         latents, kl, z_entropy = self.forward_encoder(data)
         tr_loss, adapted_classifier_weights, encoder_penalty, decoder_entropy = self.leo_inner_loop(
             data, latents)
-
+        #here do inner gradient update. val_loss is the loss we use to update the theta distribution.
         val_loss, val_accuracy = self.finetuning_inner_loop(
             data, tr_loss, adapted_classifier_weights)
 
         val_loss += self._kl_weight * kl
         val_loss += self._encoder_penalty_weight * encoder_penalty
+
 
         """
         Mutual Information term added in the loss function
@@ -146,7 +150,7 @@ class LEO(snt.AbstractModule):
                 "lr", [1, 1, self._num_latents],
                 dtype=self._float_dtype,
                 initializer=tf.constant_initializer(self._inner_lr_init))
-        starting_latents = latents
+        starting_latents = latents # theta
         loss, _ = self.forward_decoder(data, latents)
         for _ in range(self._inner_unroll_length):
             loss_grad = tf.gradients(loss, latents)  # dLtrain/dz
@@ -170,12 +174,14 @@ class LEO(snt.AbstractModule):
                 "lr", [1, 1, self.embedding_dim],
                 dtype=self._float_dtype,
                 initializer=tf.constant_initializer(self._finetuning_lr_init))
+        # Here is the inner loop update on the output of decder
         for _ in range(self._finetuning_unroll_length):
             loss_grad = tf.gradients(tr_loss, classifier_weights)
             classifier_weights -= finetuning_lr * loss_grad[0]
+            # after we do one gradiant update, we calculate the meta-trainning loss.
             tr_loss, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
                                                    classifier_weights)
-
+        # After all inner loop updates, we compute the meta val_loss to update the z latent codes
         val_loss, val_accuracy = self.calculate_inner_loss(
             data.val_input, data.val_output, classifier_weights)
         return val_loss, val_accuracy
@@ -190,23 +196,26 @@ class LEO(snt.AbstractModule):
         relation_network_outputs = self.relation_network(encoder_outputs)
         latent_dist_params = self.average_codes_per_class(relation_network_outputs)
 
-        # latents, kl = self.possibly_sample(latent_dist_params) # original
-        latents, kl, z_entropy = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
-
+        if self.num_MAF_layers > 0:
+            latents, kl, z_entropy = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
+        else:
+            latents, kl, z_entropy = self.possibly_sample(latent_dist_params)  # original
         return latents, kl, z_entropy
 
     @snt.reuse_variables
     def forward_decoder(self, data, latents, z_entropy=None):
+        # latents are z (which is theta's distribution )
         weights_dist_params = self.decoder(latents)
         # Default to glorot_initialization and not stddev=1.
         fan_in = self.embedding_dim.value
         fan_out = self.num_classes.value
         stddev_offset = np.sqrt(2. / (fan_out + fan_in))
+        # classifier_weights is theta'_i
         classifier_weights, _ = self.possibly_sample(weights_dist_params,
                                                      stddev_offset=stddev_offset)
         tr_loss, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
                                                classifier_weights)
-        # get the entropy of the decoder output -- distribution of x|z, where x is the task specific params's dist. 
+        # get the entropy of the decoder output -- distribution of x|z, where x is the task specific params's dist.
         decoder_entropy = weights_dist_params.entropy()
         return tr_loss, classifier_weights, decoder_entropy
 
@@ -282,7 +291,7 @@ class LEO(snt.AbstractModule):
     def maf_flow(self, z_dist, latent_size, n_flows, hidden_size=(512, 512), invert=False, prior=False):
         def init_once(x, name, prior):
             if prior:
-                return tf.get_variable(name+"_prior", initializer=x, trainable=False)
+                return tf.get_variable(name + "_prior", initializer=x, trainable=False)
             else:
                 return tf.get_variable(name, initializer=x, trainable=False)
 
@@ -316,7 +325,7 @@ class LEO(snt.AbstractModule):
             distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
         return kl, z_entropy
 
-    def possibly_sample_maf(self, distribution_params, stddev_offset=0., n_flows=3):
+    def possibly_sample_maf(self, distribution_params, stddev_offset=0.):
         """
         TODO @Karen
         Change sampling to potentially mixture of Gaussian (not necessarily if we use flow based models)
@@ -334,7 +343,7 @@ class LEO(snt.AbstractModule):
                 loc=means,
                 scale_diag=stddev),
             latent_size=means.shape[-1],
-            n_flows=n_flows
+            n_flows=self.num_MAF_layers,
         )
 
         samples = distribution.sample()
@@ -350,7 +359,7 @@ class LEO(snt.AbstractModule):
         if not self.is_meta_training:
             return means, tf.constant(0., dtype=self._float_dtype)
         samples = distribution.sample()
-        kl_divergence,z_entropy = self.kl_divergence(samples, distribution)
+        kl_divergence, z_entropy = self.kl_divergence(samples, distribution)
         return samples, kl_divergence,z_entropy
 
     def kl_divergence(self, samples, distribution):
