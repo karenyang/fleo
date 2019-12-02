@@ -26,6 +26,7 @@ import tensorflow as tf
 
 import config
 import data
+import numpy as np
 
 def unpack_data(problem_instance):
     """Map data.ProblemInstance to a list of Tensors, to process with map_fn."""
@@ -108,4 +109,5 @@ def evaluate_and_average(session, tensor, num_estimates):
         tensor_value_estimates.append(session.run(tensor))
         print(i, tensor_value_estimates[-1])
     average_tensor_value = sum(tensor_value_estimates) / num_estimates
-    return average_tensor_value
+    std = np.std(tensor_value_estimates)
+    return average_tensor_value, std

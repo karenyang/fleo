@@ -195,13 +195,13 @@ def run_training_loop(checkpoint_path):
             num_metatest_estimates = (
                     10000 // outer_model_config["metatest_batch_size"])
             # num_metatest_estimates = 10
-            test_accuracy = utils.evaluate_and_average(sess, metatest_accuracy,
+            test_accuracy, std = utils.evaluate_and_average(sess, metatest_accuracy,
                                                        num_metatest_estimates)
 
             tf.logging.info("Metatest accuracy: %f", test_accuracy)
             with tf.gfile.Open(
                     os.path.join(checkpoint_path, "test_accuracy"), "wb") as f:
-                pickle.dump(test_accuracy, f)
+                pickle.dump((test_accuracy, std ), f)
 
 
 def main(argv):
