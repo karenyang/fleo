@@ -57,6 +57,19 @@ def get_orthogonality_regularizer(orthogonality_penalty_weight):
 
     return orthogonality
 
+def compute_kernel(x, y):
+    x_size = tf.shape(x)[0]
+    y_size = tf.shape(y)[0]
+    dim = tf.shape(x)[1]
+    tiled_x = tf.tile(tf.reshape(x, tf.stack([x_size, 1, dim])), tf.stack([1, y_size, 1]))
+    tiled_y = tf.tile(tf.reshape(y, tf.stack([1, y_size, dim])), tf.stack([x_size, 1, 1]))
+    return tf.exp(-tf.reduce_mean(tf.square(tiled_x - tiled_y), axis=2) / tf.cast(dim, tf.float32))
+
+def compute_mmd(x, y):
+    x_kernel = compute_kernel(x, x)
+    y_kernel = compute_kernel(y, y)
+    xy_kernel = compute_kernel(x, y)
+    return tf.reduce_mean(x_kernel) + tf.reduce_mean(y_kernel) - 2 * tf.reduce_mean(xy_kernel)
 
 class LEO(snt.AbstractModule):
     """Sonnet module implementing the inner loop of LEO."""
@@ -80,7 +93,9 @@ class LEO(snt.AbstractModule):
         # lambda_2
         self._orthogonality_penalty_weight = config["orthogonality_penalty_weight"]
         self.num_MAF_layers = config['num_MAF_layers']
-
+        self._mi_weight =  config['mi_weight']
+        self._add_mi_loss =  config['add_mi_loss']
+        self._add_mmd_loss = config['add_mmd_loss']
         assert self._inner_unroll_length > 0, ("Positive unroll length is necessary"
                                                " to create the graph")
 
@@ -128,6 +143,19 @@ class LEO(snt.AbstractModule):
         # because it is not used in self.grads_and_vars.
         regularization_penalty = (
                 self._l2_regularization + self._decoder_orthogonality_reg)
+
+        # MMD (maximum mean discrepency) loss
+        z_prior_samples = self.maf_latent_prior.sample(sample_shape=(latents.shape))
+        loss_mmd = compute_mmd(z_prior_samples, latents)
+        print("MMD loss: {:.4f}".format(loss_mmd))
+        # Mutual Information (conditional entropy) loss
+        loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
+        print("MI loss: {:.4f}".format(loss_mi))
+
+        if self._add_mmd_loss:
+            regularization_penalty += self._mi_weight * loss_mmd
+        elif self._add_mi_loss:
+            regularization_penalty += self._mi_weight * loss_mi
 
         batch_val_loss = tf.reduce_mean(val_loss)
         batch_val_accuracy = tf.reduce_mean(val_accuracy)
@@ -305,23 +333,24 @@ class LEO(snt.AbstractModule):
         :return:
         """
         latent_size = samples.shape[-1]
-        maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
+        self.maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
             loc=tf.zeros([latent_size], dtype=tf.float32),
             scale_diag=tf.ones([latent_size], dtype=tf.float32)),
             latent_size, n_flows, prior=True)
+
         kl = tf.reduce_mean(
-            distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
+            distribution.log_prob(samples) - self.maf_latent_prior.log_prob(samples))
         return kl
 
     def possibly_sample_maf(self, distribution_params, stddev_offset=0.):
         """
         TODO @Karen
-        Change sampling to potentially mixture of Gaussian (not necessarily if we use flow based models)
         """
         means, unnormalized_stddev = tf.split(distribution_params, 2, axis=-1)
         stddev = tf.exp(unnormalized_stddev)
         stddev -= (1. - stddev_offset)
         stddev = tf.maximum(stddev, 1e-10)
+        self.z_stddev = stddev
         if not self.is_meta_training:
             return means, tf.constant(0., dtype=self._float_dtype)
         # distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)

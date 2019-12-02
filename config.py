@@ -93,6 +93,13 @@ flags.DEFINE_float(
 flags.DEFINE_integer("num_MAF_layers", 3, "layers to use fpr MAF after encoder")
 
 
+flags.DEFINE_boolean("add_mi_loss", False, "add mutual information loss term  ")
+
+flags.DEFINE_boolean("add_mdd_loss", True, "add mdd information loss term. ")
+
+flags.DEFINE_float("mi_weight", 1e-2, "mutual information or mmd loss term weight ")
+
+
 def get_data_config():
     config = {}
     config["data_path"] = FLAGS.data_path
@@ -117,6 +124,9 @@ def get_inner_model_config():
     config["l2_penalty_weight"] = FLAGS.l2_penalty_weight
     config["orthogonality_penalty_weight"] = FLAGS.orthogonality_penalty_weight
     config['num_MAF_layers'] = FLAGS.num_MAF_layers
+    config['add_mi_loss'] = FLAGS.add_mi_loss
+    config['add_mmd_loss'] = FLAGS.add_mdd_loss
+    config['mi_weight'] = FLAGS.mi_weight
 
     return config
 
