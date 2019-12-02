@@ -51,12 +51,21 @@ class DataProvider(object):
         tr_output, val_output = tf.Variable(Y[:, :tr_size], tf.int32), tf.Variable(Y[:, tr_size:], tf.int32)
         tr_input, val_input = tf.expand_dims(tr_input, axis=-1), tf.expand_dims(val_input, axis=-1)
         tr_output, val_output = tf.expand_dims(tr_output, axis=-1), tf.expand_dims(val_output, axis=-1) 
-        return tr_input, tr_output, functions_list[:tr_size], val_input, val_output, functions_list[tr_size:]
+        #return tr_input, tr_output, functions_list[:tr_size], val_input, val_output, functions_list[tr_size:]
+        return tr_input, tr_output, tf.zeros((num_tasks, tr_size), tf.float32), val_input, val_output, tf.zeros((num_tasks, val_size), tf.float32)
 
     def get_batch(self, num_tasks, tr_size, val_size):
         tasks_batch = self.get_instance(num_tasks, tr_size, val_size)
-        import pdb; pdb.set_trace()
-        return ProblemInstance(*tasks_batch)
+        correct_task_batch = []
+        for task in tasks_batch:
+          if task.dtype == tf.float64:
+            correct_task_batch.append(tf.cast(task, tf.float32))
+          elif task.dtype == tf.int64:
+            correct_task_batch.append(tf.cast(task, tf.int32))
+          else:
+           correct_task_batch.append(task)
+        return ProblemInstance(*correct_task_batch)
+        #return ProblemInstance(*tasks_batch)
 
     # NUM_CLASSES = 100  # total number of classes in dataset
     # def get_instance(self, num_classes, tr_size, val_size):

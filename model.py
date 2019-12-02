@@ -29,7 +29,7 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-import data as data_module
+import toy_data as data_module
 
 
 def get_orthogonality_regularizer(orthogonality_penalty_weight):
@@ -102,8 +102,8 @@ class LEO(snt.AbstractModule):
       the latent space and finetuning).
     """
     if isinstance(data, list):
-      data = data_module.ProblemInstance(*data)
-    import pdb; pdb.set_trace()
+        import pdb;pdb.set_trace()
+        data = data_module.ProblemInstance(*data)
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
 
