@@ -66,6 +66,8 @@ def compute_kernel(x, y):
     return tf.exp(-tf.reduce_mean(tf.square(tiled_x - tiled_y), axis=2) / tf.cast(dim, tf.float32))
 
 def compute_mmd(x, y):
+    x = tf.reshape(x, [-1, x.shape[-1]])
+    y = tf.reshape(y, [-1, y.shape[-1]])
     x_kernel = compute_kernel(x, x)
     y_kernel = compute_kernel(y, y)
     xy_kernel = compute_kernel(x, y)
@@ -330,11 +332,10 @@ class LEO(snt.AbstractModule):
             distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
 
         # # MMD (maximum mean discrepency) loss
-        # loss_mmd = compute_mmd(maf_latent_prior.sample(samples.shape[0]), tf.squeeze(samples))
+        loss_mmd = compute_mmd(maf_latent_prior.sample(samples.shape[0]), tf.squeeze(samples))
         # return kl, loss_mmd
         # Mutual Information (conditional entropy) loss
-        loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
-        return kl, loss_mi
+        return kl, loss_mmd
 
     def possibly_sample_maf(self, distribution_params, stddev_offset=0.):
         """
