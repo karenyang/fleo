@@ -32,8 +32,8 @@ import model
 import utils
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("checkpoint_path", "/tmp/leo_mmd/", "Path to restore from and "
-                                                       "save to checkpoints.")
+flags.DEFINE_string("checkpoint_path", "/logs/leo_mmd/", "Path to restore from and "
+                                                        "save to checkpoints.")
 flags.DEFINE_integer(
     "checkpoint_steps", 1000, "The frequency, in number of "
                               "steps, of saving the checkpoints.")
@@ -144,8 +144,7 @@ def construct_graph(outer_model_config):
         outer_model_config["metatest_batch_size"], "test", num_classes,
         num_tr_examples_per_class,
         total_examples_per_class - num_tr_examples_per_class)
-    _, metatest_accuracy = _construct_loss_and_accuracy(
-        leo, metatest_batch, False)
+    _, metatest_accuracy = _construct_loss_and_accuracy(leo, metatest_batch, False)
     _construct_validation_summaries(metavalid_loss, metavalid_accuracy)
 
     return (train_op, global_step, metatrain_accuracy, metavalid_accuracy,

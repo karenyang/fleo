@@ -97,7 +97,7 @@ flags.DEFINE_boolean("add_mi_loss", False, "add mutual information loss term  ")
 
 flags.DEFINE_boolean("add_mdd_loss", True, "add mdd information loss term. ")
 
-flags.DEFINE_float("mi_weight", 1e-2, "mutual information or mmd loss term weight ")
+flags.DEFINE_float("mi_weight", 0.5, "mutual information or mmd loss term weight ")
 
 
 def get_data_config():

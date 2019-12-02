@@ -73,7 +73,6 @@ def compute_mmd(x, y):
 
 class LEO(snt.AbstractModule):
     """Sonnet module implementing the inner loop of LEO."""
-
     def __init__(self, config=None, use_64bits_dtype=True, name="leo"):
         super(LEO, self).__init__(name=name)
 
@@ -127,15 +126,16 @@ class LEO(snt.AbstractModule):
         self.is_meta_training = is_meta_training
         self.save_problem_instance_stats(data.tr_input)
 
-        latents, kl = self.forward_encoder(data)
+        latents, kl, loss_mmd = self.forward_encoder(data)
         #before inner gradient update. tr_loss is the initial classifier loss using the theta (sampled from decoder output)
         tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
             data, latents)
         #here do inner gradient update. val_loss is the loss we use to update the theta distribution.
+
         val_loss, val_accuracy = self.finetuning_inner_loop(
             data, tr_loss, adapted_classifier_weights)
 
-        val_loss += self._kl_weight * kl
+        val_loss += self._kl_weight * kl + self._mi_weight * loss_mmd
         val_loss += self._encoder_penalty_weight * encoder_penalty
 
         # The l2 regularization is is already added to the graph when constructing
@@ -145,21 +145,19 @@ class LEO(snt.AbstractModule):
                 self._l2_regularization + self._decoder_orthogonality_reg)
 
         # MMD (maximum mean discrepency) loss
-        z_prior_samples = self.maf_latent_prior.sample(sample_shape=(latents.shape))
-        loss_mmd = compute_mmd(z_prior_samples, latents)
-        print("MMD loss: {:.4f}".format(loss_mmd))
-        # Mutual Information (conditional entropy) loss
-        loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
-        print("MI loss: {:.4f}".format(loss_mi))
 
-        if self._add_mmd_loss:
-            regularization_penalty += self._mi_weight * loss_mmd
-        elif self._add_mi_loss:
-            regularization_penalty += self._mi_weight * loss_mi
+        # Mutual Information (conditional entropy) loss
+        # loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
+        # elif self._add_mi_loss:
+        #     regularization_penalty += self._mi_weight * loss_mi
+        # z_prior_samples = self.maf_latent_prior.sample(latents.shape[0])
+        # loss_mmd = compute_mmd(z_prior_samples, tf.squeeze(latents))
+        # if self._add_mmd_loss:
+        #     regularization_penalty += self._mi_weight * loss_mmd
+
 
         batch_val_loss = tf.reduce_mean(val_loss)
         batch_val_accuracy = tf.reduce_mean(val_accuracy)
-
         return batch_val_loss + regularization_penalty, batch_val_accuracy
 
     @snt.reuse_variables
@@ -216,10 +214,11 @@ class LEO(snt.AbstractModule):
         latent_dist_params = self.average_codes_per_class(relation_network_outputs)
 
         if self.num_MAF_layers > 0:
-            latents, kl = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
+            latents, kl, loss_mmd = self.possibly_sample_maf(latent_dist_params)  # Modify to use 3 MAF layers
         else:
             latents, kl = self.possibly_sample(latent_dist_params)  # original
-        return latents, kl
+
+        return latents, kl, loss_mmd
 
     @snt.reuse_variables
     def forward_decoder(self, data, latents):
@@ -333,14 +332,17 @@ class LEO(snt.AbstractModule):
         :return:
         """
         latent_size = samples.shape[-1]
-        self.maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
+        maf_latent_prior = self.maf_flow(tfd.MultivariateNormalDiag(
             loc=tf.zeros([latent_size], dtype=tf.float32),
             scale_diag=tf.ones([latent_size], dtype=tf.float32)),
             latent_size, n_flows, prior=True)
 
         kl = tf.reduce_mean(
-            distribution.log_prob(samples) - self.maf_latent_prior.log_prob(samples))
-        return kl
+            distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
+
+        loss_mmd = compute_mmd(maf_latent_prior.sample(samples.shape[0]), tf.squeeze(samples))
+
+        return kl, loss_mmd
 
     def possibly_sample_maf(self, distribution_params, stddev_offset=0.):
         """
@@ -352,7 +354,7 @@ class LEO(snt.AbstractModule):
         stddev = tf.maximum(stddev, 1e-10)
         self.z_stddev = stddev
         if not self.is_meta_training:
-            return means, tf.constant(0., dtype=self._float_dtype)
+            return means, tf.constant(0., dtype=self._float_dtype), tf.constant(0., dtype=self._float_dtype)
         # distribution = tfd.MultivariateNormalDiag(loc=means, scale_diag=stddev)
         # pass the means and variance from encoder through Flow transformation
         distribution = self.maf_flow(
@@ -364,8 +366,8 @@ class LEO(snt.AbstractModule):
         )
 
         samples = distribution.sample()
-        kl_divergence = self.maf_kl_divergence(samples, distribution, n_flows=self.num_MAF_layers)
-        return samples, kl_divergence
+        kl_divergence, loss_mmd = self.maf_kl_divergence(samples, distribution, n_flows=self.num_MAF_layers)
+        return samples, kl_divergence, loss_mmd
 
     def possibly_sample(self, distribution_params, stddev_offset=0.):
         means, unnormalized_stddev = tf.split(distribution_params, 2, axis=-1)
