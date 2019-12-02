@@ -144,17 +144,6 @@ class LEO(snt.AbstractModule):
         regularization_penalty = (
                 self._l2_regularization + self._decoder_orthogonality_reg)
 
-        # MMD (maximum mean discrepency) loss
-
-        # Mutual Information (conditional entropy) loss
-        # loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
-        # elif self._add_mi_loss:
-        #     regularization_penalty += self._mi_weight * loss_mi
-        # z_prior_samples = self.maf_latent_prior.sample(latents.shape[0])
-        # loss_mmd = compute_mmd(z_prior_samples, tf.squeeze(latents))
-        # if self._add_mmd_loss:
-        #     regularization_penalty += self._mi_weight * loss_mmd
-
 
         batch_val_loss = tf.reduce_mean(val_loss)
         batch_val_accuracy = tf.reduce_mean(val_accuracy)
@@ -340,9 +329,12 @@ class LEO(snt.AbstractModule):
         kl = tf.reduce_mean(
             distribution.log_prob(samples) - maf_latent_prior.log_prob(samples))
 
-        loss_mmd = compute_mmd(maf_latent_prior.sample(samples.shape[0]), tf.squeeze(samples))
-
-        return kl, loss_mmd
+        # # MMD (maximum mean discrepency) loss
+        # loss_mmd = compute_mmd(maf_latent_prior.sample(samples.shape[0]), tf.squeeze(samples))
+        # return kl, loss_mmd
+        # Mutual Information (conditional entropy) loss
+        loss_mi = tf.reduce_mean(tf.reduce_sum(tf.log(self.z_stddev), axis=1))
+        return kl, loss_mi
 
     def possibly_sample_maf(self, distribution_params, stddev_offset=0.):
         """
