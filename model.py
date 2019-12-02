@@ -103,6 +103,12 @@ class LEO(snt.AbstractModule):
     """
     if isinstance(data, list):
       data = data_module.ProblemInstance(*data)
+ #   import pdb; pdb.set_trace()
+    #data.tr_input = tf.cast(data.tr_input, tf.float32)
+    #data.val_input = tf.cast(data.val_input, tf.float32)
+    #data.val_ouput = tf.cast(data.val_output, tf.int32)
+    #data.tr_output = tf.cast(data.tr_output, tf.int32)
+    #import pdb; pdb.set_trace()
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
 
@@ -287,7 +293,8 @@ class LEO(snt.AbstractModule):
     model_outputs = self.predict(inputs, classifier_weights)
     model_predictions = tf.argmax(
         model_outputs, -1, output_type=self._int_dtype)
-#    import pdb; pdb.set_trace() 
+ #   import pdb; pdb.set_trace()
+    #true_outputs = tf.cast(true_outputs, tf.int32)
     accuracy = tf.contrib.metrics.accuracy(model_predictions,
                                            tf.squeeze(true_outputs, axis=-1))
 

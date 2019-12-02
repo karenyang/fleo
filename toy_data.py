@@ -64,7 +64,7 @@ class DataProvider(object):
         return tr_input, tr_output, tf.zeros((num_classes, tr_size), tf.float32), val_input, val_output, tf.zeros((num_classes, val_size), tf.float32)
 
     def get_batch(self, batch_size, num_classes, tr_size, val_size,
-                  num_threads=10):
+            num_threads=10):
 
         one_instance = self.get_instance(num_classes, tr_size, val_size)
         tr_data_size = (num_classes, tr_size)
@@ -83,8 +83,17 @@ class DataProvider(object):
 
         if self._verbose:
             tf.logging.info(task_batch)
-
-        return ProblemInstance(*task_batch)
+        #import pdb; pdb.set_trace()
+        correct_task_batch = []
+        for task in task_batch:
+            if task.dtype == tf.float64:
+                correct_task_batch.append(tf.cast(task, tf.float32))
+            elif task.dtype == tf.int64:
+                correct_task_batch.append(tf.cast(task, tf.int32))
+            else: 
+                correct_task_batch.append(task)
+        #import pdb; pdb.set_trace()
+        return ProblemInstance(*correct_task_batch)
 
     def _str_to_list(self, list_as_str):
         items = list_as_str[1:-1].split(",")

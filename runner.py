@@ -107,7 +107,7 @@ def construct_graph(outer_model_config):
   """Constructs the optimization graph."""
   inner_model_config = config.get_inner_model_config()
   tf.logging.info("inner_model_config: {}".format(inner_model_config))
-  leo = model.LEO(inner_model_config, use_64bits_dtype=True) # todo: change back to false
+  leo = model.LEO(inner_model_config, use_64bits_dtype=False) # todo: change back to false
 
   num_classes = outer_model_config["num_classes"]
   num_tr_examples_per_class = outer_model_config["num_tr_examples_per_class"]
