@@ -49,6 +49,8 @@ class DataProvider(object):
         X, Y = np.array(X_list), np.array(Y_list)
         tr_input, val_input = tf.Variable(X[:, :tr_size], tf.float32), tf.Variable(X[:, tr_size:], tf.float32)
         tr_output, val_output = tf.Variable(Y[:, :tr_size], tf.int32), tf.Variable(Y[:, tr_size:], tf.int32)
+        tr_input, val_input = tf.expand_dims(tr_input, axis=-1), tf.expand_dims(val_input, axis=-1)
+        tr_output, val_output = tf.expand_dims(tr_output, axis=-1), tf.expand_dims(val_output, axis=-1) 
         return tr_input, tr_output, functions_list[:tr_size], val_input, val_output, functions_list[tr_size:]
 
     def get_batch(self, num_tasks, tr_size, val_size):

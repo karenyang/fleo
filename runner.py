@@ -83,7 +83,7 @@ def _construct_examples_batch(batch_size, split, num_classes,
   else:
       print("using normal dataset")
       data_provider = data.DataProvider(split, config.get_data_config())
-  examples_batch = data_provider.get_batch(batch_size, num_classes,
+  examples_batch = data_provider.get_batch(batch_size, 
                                            num_tr_examples_per_class,
                                            num_val_examples_per_class)
   return utils.unpack_data(examples_batch)

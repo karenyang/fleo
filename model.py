@@ -170,8 +170,9 @@ class LEO(snt.AbstractModule):
   @snt.reuse_variables
   def forward_encoder(self, data):
     encoder_outputs = self.encoder(data.tr_input)
-    relation_network_outputs = self.relation_network(encoder_outputs)
-    latent_dist_params = self.average_codes_per_class(relation_network_outputs)
+    #relation_network_outputs = self.relation_network(encoder_outputs)
+    import pdb; pdb.set_trace()
+    latent_dist_params = self.average_codes_per_class(encoder_outputs)
     latents, kl = self.possibly_sample(latent_dist_params)
     return latents, kl
 
