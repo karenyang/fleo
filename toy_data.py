@@ -43,8 +43,8 @@ class DataProvider(object):
             df_task = self.df_dataset[self.df_dataset.task_id == task_id]
             df_sample = df_task.sample(sample_count)
             X_list.append(df_sample.X.tolist())
-            Y_list.append(df_task.Y.tolist())
-            functions_list.append(df_task.function.tolist()[0])
+            Y_list.append(df_sample.Y.tolist())
+            functions_list.append(df_sample.function.tolist()[0])
 
         X, Y = np.array(X_list), np.array(Y_list)
         tr_input, val_input = tf.Variable(X[:, :tr_size], tf.float32), tf.Variable(X[:, tr_size:], tf.float32)
@@ -55,6 +55,7 @@ class DataProvider(object):
 
     def get_batch(self, num_tasks, tr_size, val_size):
         tasks_batch = self.get_instance(num_tasks, tr_size, val_size)
+        import pdb; pdb.set_trace()
         return ProblemInstance(*tasks_batch)
 
     # NUM_CLASSES = 100  # total number of classes in dataset

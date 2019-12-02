@@ -73,7 +73,7 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     "num_val_examples_per_class", 15, "Number of validation samples per class "
     "in a task instance.")
-flags.DEFINE_integer("metatrain_batch_size", 12, "Number of problem instances "
+flags.DEFINE_integer("metatrain_batch_size", 1, "Number of problem instances "
                      "in a batch.")
 flags.DEFINE_integer("metavalid_batch_size", 200, "Number of meta-validation "
                      "problem instances.")

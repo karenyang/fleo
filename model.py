@@ -103,7 +103,7 @@ class LEO(snt.AbstractModule):
     """
     if isinstance(data, list):
       data = data_module.ProblemInstance(*data)
-
+    import pdb; pdb.set_trace()
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
 
