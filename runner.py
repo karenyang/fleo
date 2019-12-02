@@ -192,10 +192,10 @@ def run_training_loop(checkpoint_path):
                         global_step_ev, metatrain_accuracy_ev))
                 global_step_ev += 1
         else:
-            #assert not FLAGS.checkpoint_steps
-            # num_metatest_estimates = (
-            #         10000 // outer_model_config["metatest_batch_size"])
-            num_metatest_estimates = 10
+            # assert not FLAGS.checkpoint_steps
+            num_metatest_estimates = (
+                    10000 // outer_model_config["metatest_batch_size"])
+            # num_metatest_estimates = 10
             test_accuracy = utils.evaluate_and_average(sess, metatest_accuracy,
                                                        num_metatest_estimates)
 
