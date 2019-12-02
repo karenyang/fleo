@@ -103,12 +103,7 @@ class LEO(snt.AbstractModule):
     """
     if isinstance(data, list):
       data = data_module.ProblemInstance(*data)
- #   import pdb; pdb.set_trace()
-    #data.tr_input = tf.cast(data.tr_input, tf.float32)
-    #data.val_input = tf.cast(data.val_input, tf.float32)
-    #data.val_ouput = tf.cast(data.val_output, tf.int32)
-    #data.tr_output = tf.cast(data.tr_output, tf.int32)
-    #import pdb; pdb.set_trace()
+
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
 
@@ -185,7 +180,7 @@ class LEO(snt.AbstractModule):
     weights_dist_params = self.decoder(latents)
     # Default to glorot_initialization and not stddev=1.
     fan_in = self.embedding_dim.value
-    fan_out = self.num_classes.value
+    fan_out = 1  # changing for regression self.num_classes.value
     stddev_offset = np.sqrt(2. / (fan_out + fan_in))
     classifier_weights, _ = self.possibly_sample(weights_dist_params,
                                                  stddev_offset=stddev_offset)
@@ -291,14 +286,15 @@ class LEO(snt.AbstractModule):
 
   def calculate_inner_loss(self, inputs, true_outputs, classifier_weights):
     model_outputs = self.predict(inputs, classifier_weights)
-    model_predictions = tf.argmax(
-        model_outputs, -1, output_type=self._int_dtype)
+
+    # model_predictions = tf.argmax(
+    #     model_outputs, -1, output_type=self._int_dtype)
  #   import pdb; pdb.set_trace()
     #true_outputs = tf.cast(true_outputs, tf.int32)
-    accuracy = tf.contrib.metrics.accuracy(model_predictions,
-                                           tf.squeeze(true_outputs, axis=-1))
+    # accuracy = tf.contrib.metrics.accuracy(model_predictions,
+    #                                        tf.squeeze(true_outputs, axis=-1))
 
-    return self.loss_fn(model_outputs, true_outputs), accuracy
+    return tf.keras.losses.MSE(model_outputs, true_outputs), 0.0
 
   def save_problem_instance_stats(self, instance):
     num_classes, num_examples_per_class, embedding_dim = instance.get_shape()
