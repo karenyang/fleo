@@ -28,9 +28,13 @@ from six.moves import zip
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import sys
 
 import toy_data as data_module
 
+def set_trace(): 
+    import pdb; pdb.set_trace() 
+    return False
 
 def get_orthogonality_regularizer(orthogonality_penalty_weight):
   """Returns the orthogonality regularizer."""
@@ -66,7 +70,7 @@ class LEO(snt.AbstractModule):
     self._finetuning_unroll_length = config["finetuning_unroll_length"]
     self._inner_lr_init = config["inner_lr_init"]
     self._finetuning_lr_init = config["finetuning_lr_init"]
-    self._num_latents = config["num_latents"]
+    self._num_latents =  config["num_latents"]
     self._dropout_rate = config["dropout_rate"]
 
     self._kl_weight = config["kl_weight"]  # beta
@@ -101,12 +105,14 @@ class LEO(snt.AbstractModule):
       Tensor with the inner validation loss of LEO (include both adaptation in
       the latent space and finetuning).
     """
+    tf.print(data[0], [data[0]], "testing123", output_stream=sys.stdout)
     if isinstance(data, list):
         import pdb;pdb.set_trace()
         data = data_module.ProblemInstance(*data)
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
 
+    #import pdb; pdb.set_trace()
     latents, kl = self.forward_encoder(data)
     tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
         data, latents)
@@ -124,16 +130,24 @@ class LEO(snt.AbstractModule):
     batch_val_loss = tf.reduce_mean(val_loss)
     batch_val_accuracy = tf.reduce_mean(val_accuracy)
 
+    print("completed build")
     return batch_val_loss + regularization_penalty, batch_val_accuracy
 
   @snt.reuse_variables
   def leo_inner_loop(self, data, latents):
+    #data[0] = tf.print(data[0], [data[0]], "start of inner loop", output_stream=sys.stdout)
+      # tf.py_func(set_trace, inp=[], Tout=tf.bool)
     with tf.variable_scope("leo_inner"):
       inner_lr = tf.get_variable(
-          "lr", [1, 1, self._num_latents],
+              "lr", [1, 1, self._num_latents], # todo: do // 2 here to fix bug without relation network
           dtype=self._float_dtype,
           initializer=tf.constant_initializer(self._inner_lr_init))
-    starting_latents = latents
+    #import pdb; pdb.set_trace()
+    #starting_latents = latents
+    #starting_latents = tf.print(starting_latents, [starting_latents], "start of inner loop")
+    print_op = tf.print("tensors:", latents, {2: latents}, output_stream=sys.stdout)
+    with tf.control_dependencies([print_op]):
+       starting_latents = latents
     loss, _ = self.forward_decoder(data, latents)
     for _ in range(self._inner_unroll_length):
       loss_grad = tf.gradients(loss, latents)  # dLtrain/dz
@@ -147,6 +161,7 @@ class LEO(snt.AbstractModule):
     else:
       encoder_penalty = tf.constant(0., self._float_dtype)
 
+    print("completed inner loop")
     return loss, classifier_weights, encoder_penalty
 
   @snt.reuse_variables
@@ -170,9 +185,10 @@ class LEO(snt.AbstractModule):
   @snt.reuse_variables
   def forward_encoder(self, data):
     encoder_outputs = self.encoder(data.tr_input)
-    #relation_network_outputs = self.relation_network(encoder_outputs)
-    import pdb; pdb.set_trace()
-    latent_dist_params = self.average_codes_per_class(encoder_outputs)
+    relation_network_outputs = self.relation_network(encoder_outputs)
+ #   import pdb; pdb.set_trace()
+    #latent_dist_params = self.average_codes_per_class(encoder_outputs)
+    latent_dist_params = self.average_codes_per_class(relation_network_outputs)
     latents, kl = self.possibly_sample(latent_dist_params)
     return latents, kl
 
