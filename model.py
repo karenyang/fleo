@@ -310,11 +310,11 @@ class LEO(snt.AbstractModule):
     #true_outputs = tf.cast(true_outputs, tf.int32)
     # accuracy = tf.contrib.metrics.accuracy(model_predictions,
     #                                        tf.squeeze(true_outputs, axis=-1))
-
-    return tf.keras.losses.MSE(model_outputs, true_outputs), 0.0
+    loss = tf.keras.losses.MSE(model_outputs, true_outputs)
+    return loss, loss
 
   def save_problem_instance_stats(self, instance):
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     num_classes, num_examples_per_class, embedding_dim = instance.get_shape()
     if hasattr(self, "num_classes"):
       assert self.num_classes == num_classes, (

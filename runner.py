@@ -99,7 +99,7 @@ def _construct_loss_and_accuracy(inner_model, inputs, is_meta_training):
   """Returns batched loss and accuracy of the model ran on the inputs."""
   call_fn = functools.partial(
       inner_model.__call__, is_meta_training=is_meta_training)
-  import pdb; pdb.set_trace()
+  #import pdb; pdb.set_trace()
   per_instance_loss, per_instance_accuracy = tf.map_fn(
       call_fn,
       inputs,

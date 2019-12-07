@@ -92,7 +92,6 @@ flags.DEFINE_float(
     "the gradient norm. Gradient norm clipping will be applied "
     "after pointwise clipping (described above).")
 
-given
 def get_data_config():
   config = {}
   config["data_path"] = FLAGS.data_path
