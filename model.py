@@ -105,9 +105,9 @@ class LEO(snt.AbstractModule):
       Tensor with the inner validation loss of LEO (include both adaptation in
       the latent space and finetuning).
     """
-    tf.print(data[0], [data[0]], "testing123", output_stream=sys.stdout)
+    #tf.print(data[0], [data[0]], "testing123", output_stream=sys.stdout)
     if isinstance(data, list):
-        import pdb;pdb.set_trace()
+        #import pdb;pdb.set_trace()
         data = data_module.ProblemInstance(*data)
     self.is_meta_training = is_meta_training
     self.save_problem_instance_stats(data.tr_input)
@@ -143,11 +143,11 @@ class LEO(snt.AbstractModule):
           dtype=self._float_dtype,
           initializer=tf.constant_initializer(self._inner_lr_init))
     #import pdb; pdb.set_trace()
-    #starting_latents = latents
+    starting_latents = latents
     #starting_latents = tf.print(starting_latents, [starting_latents], "start of inner loop")
-    print_op = tf.print("tensors:", latents, {2: latents}, output_stream=sys.stdout)
-    with tf.control_dependencies([print_op]):
-       starting_latents = latents
+    # print_op = tf.print("tensors:", latents, {2: latents}, output_stream=sys.stdout)
+    # with tf.control_dependencies([print_op]):
+    #    starting_latents = latents
     loss, _ = self.forward_decoder(data, latents)
     for _ in range(self._inner_unroll_length):
       loss_grad = tf.gradients(loss, latents)  # dLtrain/dz
