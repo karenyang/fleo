@@ -116,7 +116,7 @@ class LEO(snt.AbstractModule):
     latents, kl = self.forward_encoder(data)
     tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
         data, latents)
-    val_loss, val_accuracy = self.finetuning_inner_loop(
+    val_loss, val_accuracy, val_input, val_pred, val_true = self.finetuning_inner_loop(
         data, tr_loss, adapted_classifier_weights)
 
     val_loss += self._kl_weight * kl
@@ -131,7 +131,7 @@ class LEO(snt.AbstractModule):
     batch_val_accuracy = tf.reduce_mean(val_accuracy)
 
     print("completed build")
-    return batch_val_loss + regularization_penalty, batch_val_accuracy
+    return batch_val_loss + regularization_penalty, batch_val_accuracy, val_input, val_pred, val_true
 
   @snt.reuse_variables
   def leo_inner_loop(self, data, latents):
@@ -175,12 +175,12 @@ class LEO(snt.AbstractModule):
     for _ in range(self._finetuning_unroll_length):
       loss_grad = tf.gradients(tr_loss, classifier_weights)
       classifier_weights -= finetuning_lr * loss_grad[0]
-      tr_loss, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
+      tr_loss, _, _, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
                                              classifier_weights)
 
-    val_loss, val_accuracy = self.calculate_inner_loss(
+    val_loss, val_accuracy, model_input, model_pred = self.calculate_inner_loss(
         data.val_input, data.val_output, classifier_weights)
-    return val_loss, val_accuracy
+    return val_loss, val_accuracy, model_input, model_pred, data.val_output
 
   @snt.reuse_variables
   def forward_encoder(self, data):
@@ -201,7 +201,7 @@ class LEO(snt.AbstractModule):
     stddev_offset = np.sqrt(2. / (fan_out + fan_in))
     classifier_weights, _ = self.possibly_sample(weights_dist_params,
                                                  stddev_offset=stddev_offset)
-    tr_loss, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
+    tr_loss, _, _, _ = self.calculate_inner_loss(data.tr_input, data.tr_output,
                                            classifier_weights)
     return tr_loss, classifier_weights
 
@@ -310,8 +310,9 @@ class LEO(snt.AbstractModule):
     #true_outputs = tf.cast(true_outputs, tf.int32)
     # accuracy = tf.contrib.metrics.accuracy(model_predictions,
     #                                        tf.squeeze(true_outputs, axis=-1))
+
     loss = tf.keras.losses.MSE(model_outputs, true_outputs)
-    return loss, loss
+    return loss, loss, inputs, model_outputs
 
   def save_problem_instance_stats(self, instance):
     #import pdb; pdb.set_trace()

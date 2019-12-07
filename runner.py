@@ -100,14 +100,14 @@ def _construct_loss_and_accuracy(inner_model, inputs, is_meta_training):
   call_fn = functools.partial(
       inner_model.__call__, is_meta_training=is_meta_training)
   #import pdb; pdb.set_trace()
-  per_instance_loss, per_instance_accuracy = tf.map_fn(
+  per_instance_loss, per_instance_accuracy, val_input, val_pred, val_true = tf.map_fn(
       call_fn,
       inputs,
       dtype=(tf.float32, tf.float32),
       back_prop=is_meta_training)
   loss = tf.reduce_mean(per_instance_loss)
   accuracy = tf.reduce_mean(per_instance_accuracy)
-  return loss, accuracy
+  return loss, accuracy, val_input, val_pred, val_true
 
 
 def construct_graph(outer_model_config):
@@ -122,7 +122,7 @@ def construct_graph(outer_model_config):
       outer_model_config["metatrain_batch_size"], "train", num_classes,
       num_tr_examples_per_class,
       outer_model_config["num_val_examples_per_class"])
-  metatrain_loss, metatrain_accuracy = _construct_loss_and_accuracy(
+  metatrain_loss, metatrain_accuracy, metatrain_val_input, metatrain_val_pred, metatrain_val_true = _construct_loss_and_accuracy(
       leo, metatrain_batch, True)
 
   metatrain_gradients, metatrain_variables = leo.grads_and_vars(metatrain_loss)
@@ -151,19 +151,21 @@ def construct_graph(outer_model_config):
       outer_model_config["metavalid_batch_size"], "val", num_classes,
       num_tr_examples_per_class,
       total_examples_per_class - num_tr_examples_per_class)
-  metavalid_loss, metavalid_accuracy = _construct_loss_and_accuracy(
+  metavalid_loss, metavalid_accuracy, metavalid_val_input, metavalid_val_pred, metavalid_val_true = _construct_loss_and_accuracy(
       leo, metavalid_batch, False)
 
   metatest_batch = _construct_examples_batch(
       outer_model_config["metatest_batch_size"], "test", num_classes,
       num_tr_examples_per_class,
       total_examples_per_class - num_tr_examples_per_class)
-  _, metatest_accuracy = _construct_loss_and_accuracy(
+  _, metatest_accuracy, metatest_input, metatest_pred, metatest_true = _construct_loss_and_accuracy(
       leo, metatest_batch, False)
   _construct_validation_summaries(metavalid_loss, metavalid_accuracy)
 
+  test_input_op, test_pred_op, test_true_op = metatest_input, metatest_pred, metatest_true
+
   return (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-          metatest_accuracy)
+          metatest_accuracy, test_input_op, test_pred_op, test_true_op )
 
 
 def run_training_loop(checkpoint_path):
@@ -171,7 +173,7 @@ def run_training_loop(checkpoint_path):
   outer_model_config = config.get_outer_model_config()
   tf.logging.info("outer_model_config: {}".format(outer_model_config))
   (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-   metatest_accuracy) = construct_graph(outer_model_config)
+   metatest_accuracy, test_input_op, test_pred_op, test_true_op) = construct_graph(outer_model_config)
 
   num_steps_limit = outer_model_config["num_steps_limit"]
   best_metavalid_accuracy = 0.
@@ -210,6 +212,10 @@ def run_training_loop(checkpoint_path):
 
       test_accuracy = utils.evaluate_and_average(sess, metatest_accuracy,
                                                  num_metatest_estimates)
+      test_input, test_pred, test_true = sess.run([test_input_op, test_pred_op, test_true_op])
+      print("Test input {}".format(test_input))
+      print("Test pred {}".format(test_pred))
+      print("Test true {}".format(test_true))
 
       tf.logging.info("Metatest accuracy: %f", test_accuracy)
       with tf.gfile.Open(
