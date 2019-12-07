@@ -32,7 +32,7 @@ import toy_data
 import model
 import utils
 
-USE_TOY_DATASET = False
+USE_TOY_DATASET = True
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("checkpoint_path", "/tmp/leo", "Path to restore from and "
@@ -99,6 +99,7 @@ def _construct_loss_and_accuracy(inner_model, inputs, is_meta_training):
   """Returns batched loss and accuracy of the model ran on the inputs."""
   call_fn = functools.partial(
       inner_model.__call__, is_meta_training=is_meta_training)
+  import pdb; pdb.set_trace()
   per_instance_loss, per_instance_accuracy = tf.map_fn(
       call_fn,
       inputs,

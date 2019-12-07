@@ -33,6 +33,7 @@ class DataProvider(object):
         val_functions list (batch_size,) 
     """
     def get_instance(self, num_tasks, tr_size, val_size):
+        print("num tasks: {}".format(num_tasks))
         sample_count = tr_size + val_size
         all_task_ids = list(range(NUM_TASKS))
         sampled_task_ids = random.sample(all_task_ids, num_tasks)
@@ -55,7 +56,7 @@ class DataProvider(object):
         tr_input, val_input = tf.expand_dims(tr_input, axis=0), tf.expand_dims(val_input, axis=0)
         tr_output, val_output = tf.expand_dims(tr_output, axis=0), tf.expand_dims(val_output, axis=0)
         #return tr_input, tr_output, functions_list[:tr_size], val_input, val_output, functions_list[tr_size:]
-        return tr_input, tr_output, tf.zeros((num_tasks, tr_size), tf.float32), val_input, val_output, tf.zeros((num_tasks, val_size), tf.float32)
+        return tr_input, tr_output, tf.zeros((1, num_tasks, tr_size), tf.float32), val_input, val_output, tf.zeros((1, num_tasks, val_size), tf.float32)
 
     def get_batch(self, num_tasks, tr_size, val_size):
         tasks_batch = self.get_instance(num_tasks, tr_size, val_size)

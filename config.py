@@ -75,9 +75,9 @@ flags.DEFINE_integer(
     "in a task instance.")
 flags.DEFINE_integer("metatrain_batch_size", 2, "Number of problem instances "
                      "in a batch.")
-flags.DEFINE_integer("metavalid_batch_size", 200, "Number of meta-validation "
+flags.DEFINE_integer("metavalid_batch_size", 2, "Number of meta-validation " # todo: this defines number of tasks
                      "problem instances.")
-flags.DEFINE_integer("metatest_batch_size", 200, "Number of meta-testing "
+flags.DEFINE_integer("metatest_batch_size", 2, "Number of meta-testing "
                      "problem instances.")
 flags.DEFINE_integer("num_steps_limit", int(1e5), "Number of steps to train "
                      "for.")

@@ -314,6 +314,7 @@ class LEO(snt.AbstractModule):
     return tf.keras.losses.MSE(model_outputs, true_outputs), 0.0
 
   def save_problem_instance_stats(self, instance):
+    import pdb; pdb.set_trace()
     num_classes, num_examples_per_class, embedding_dim = instance.get_shape()
     if hasattr(self, "num_classes"):
       assert self.num_classes == num_classes, (
