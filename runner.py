@@ -197,7 +197,7 @@ def run_training_loop(checkpoint_path):
           print("val pred {}".format(val_pred))
           print("val true {}".format(val_true))
 
-          tf.logging.info("Step: {} meta-valid accuracy: {}".format(
+          tf.logging.info("Step: {} meta-valid MSE: {}".format(
               global_step_ev, metavalid_accuracy_ev))
 
           if metavalid_accuracy_ev > best_metavalid_accuracy:
@@ -208,7 +208,7 @@ def run_training_loop(checkpoint_path):
         _, global_step_ev, metatrain_accuracy_ev = sess.run(
             [train_op, global_step, metatrain_accuracy])
         if global_step_ev % (FLAGS.checkpoint_steps // 2) == 0:
-          tf.logging.info("Step: {} meta-train accuracy: {}".format(
+          tf.logging.info("Step: {} meta-train MSE: {}".format(
               global_step_ev, metatrain_accuracy_ev))
     else:
       assert not FLAGS.checkpoint_steps
@@ -218,7 +218,7 @@ def run_training_loop(checkpoint_path):
       test_accuracy = utils.evaluate_and_average(sess, metatest_accuracy,
                                                  num_metatest_estimates)
 
-      tf.logging.info("Metatest accuracy: %f", test_accuracy)
+      tf.logging.info("Metatest MSE: %f", test_accuracy)
       with tf.gfile.Open(
           os.path.join(checkpoint_path, "test_accuracy"), "wb") as f:
         pickle.dump(test_accuracy, f)
