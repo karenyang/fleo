@@ -103,7 +103,7 @@ def _construct_loss_and_accuracy(inner_model, inputs, is_meta_training):
   per_instance_loss, per_instance_accuracy, val_input, val_pred, val_true = tf.map_fn(
       call_fn,
       inputs,
-      dtype=(tf.float32, tf.float32),
+      dtype=(tf.float32, tf.float32, tf.float32, tf.float32, tf.float32),
       back_prop=is_meta_training)
   loss = tf.reduce_mean(per_instance_loss)
   accuracy = tf.reduce_mean(per_instance_accuracy)
@@ -162,10 +162,10 @@ def construct_graph(outer_model_config):
       leo, metatest_batch, False)
   _construct_validation_summaries(metavalid_loss, metavalid_accuracy)
 
-  test_input_op, test_pred_op, test_true_op = metatest_input, metatest_pred, metatest_true
+  val_input_op, val_pred_op, val_true_op = metavalid_val_input, metavalid_val_pred, metavalid_val_true
 
   return (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-          metatest_accuracy, test_input_op, test_pred_op, test_true_op )
+          metatest_accuracy, val_input_op, val_pred_op, val_true_op)
 
 
 def run_training_loop(checkpoint_path):
@@ -173,7 +173,7 @@ def run_training_loop(checkpoint_path):
   outer_model_config = config.get_outer_model_config()
   tf.logging.info("outer_model_config: {}".format(outer_model_config))
   (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-   metatest_accuracy, test_input_op, test_pred_op, test_true_op) = construct_graph(outer_model_config)
+   metatest_accuracy, val_input_op, val_pred_op, val_true_op) = construct_graph(outer_model_config)
 
   num_steps_limit = outer_model_config["num_steps_limit"]
   best_metavalid_accuracy = 0.
@@ -192,6 +192,11 @@ def run_training_loop(checkpoint_path):
           # the best checkpoint for early stopping.
           metavalid_accuracy_ev = utils.evaluate_and_average(
               sess, metavalid_accuracy, 10)
+          val_input, val_pred, val_true = sess.run([val_input_op, val_pred_op, val_true_op])
+          print("val input {}".format(val_input))
+          print("val pred {}".format(val_pred))
+          print("val true {}".format(val_true))
+
           tf.logging.info("Step: {} meta-valid accuracy: {}".format(
               global_step_ev, metavalid_accuracy_ev))
 
@@ -212,10 +217,6 @@ def run_training_loop(checkpoint_path):
 
       test_accuracy = utils.evaluate_and_average(sess, metatest_accuracy,
                                                  num_metatest_estimates)
-      test_input, test_pred, test_true = sess.run([test_input_op, test_pred_op, test_true_op])
-      print("Test input {}".format(test_input))
-      print("Test pred {}".format(test_pred))
-      print("Test true {}".format(test_true))
 
       tf.logging.info("Metatest accuracy: %f", test_accuracy)
       with tf.gfile.Open(
