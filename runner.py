@@ -82,7 +82,7 @@ def _construct_examples_batch(batch_size, split, num_classes,
   if USE_TOY_DATASET:  # todo: fix. temporarily added as true
       print("using toy dataset")
       data_provider = toy_data.DataProvider(split)
-      examples_batch = data_provider.get_batch(batch_size,
+      examples_batch, functions_list = data_provider.get_batch(batch_size,
                                                num_tr_examples_per_class,
                                                num_val_examples_per_class)
   else:
@@ -92,7 +92,7 @@ def _construct_examples_batch(batch_size, split, num_classes,
                                                num_classes,
                                                num_tr_examples_per_class,
                                                num_val_examples_per_class)
-  return utils.unpack_data(examples_batch)
+  return utils.unpack_data(examples_batch), functions_list
 
 
 def _construct_loss_and_accuracy(inner_model, inputs, is_meta_training):
@@ -118,7 +118,7 @@ def construct_graph(outer_model_config):
 
   num_classes = outer_model_config["num_classes"]
   num_tr_examples_per_class = outer_model_config["num_tr_examples_per_class"]
-  metatrain_batch = _construct_examples_batch(
+  metatrain_batch, metrain_functions = _construct_examples_batch(
       outer_model_config["metatrain_batch_size"], "train", num_classes,
       num_tr_examples_per_class,
       outer_model_config["num_val_examples_per_class"])
@@ -147,14 +147,14 @@ def construct_graph(outer_model_config):
   data_config = config.get_data_config()
   tf.logging.info("data_config: {}".format(data_config))
   total_examples_per_class = data_config["total_examples_per_class"]
-  metavalid_batch = _construct_examples_batch(
+  metavalid_batch, metavalid_functions = _construct_examples_batch(
       outer_model_config["metavalid_batch_size"], "val", num_classes,
       num_tr_examples_per_class,
       total_examples_per_class - num_tr_examples_per_class)
   metavalid_loss, metavalid_accuracy, metavalid_val_input, metavalid_val_pred, metavalid_val_true = _construct_loss_and_accuracy(
       leo, metavalid_batch, False)
 
-  metatest_batch = _construct_examples_batch(
+  metatest_batch, metatest_functions = _construct_examples_batch(
       outer_model_config["metatest_batch_size"], "test", num_classes,
       num_tr_examples_per_class,
       total_examples_per_class - num_tr_examples_per_class)
@@ -165,7 +165,7 @@ def construct_graph(outer_model_config):
   val_input_op, val_pred_op, val_true_op = metavalid_val_input, metavalid_val_pred, metavalid_val_true
 
   return (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-          metatest_accuracy, val_input_op, val_pred_op, val_true_op)
+          metatest_accuracy, val_input_op, val_pred_op, val_true_op, metavalid_functions)
 
 
 def run_training_loop(checkpoint_path):
@@ -173,7 +173,7 @@ def run_training_loop(checkpoint_path):
   outer_model_config = config.get_outer_model_config()
   tf.logging.info("outer_model_config: {}".format(outer_model_config))
   (train_op, global_step, metatrain_accuracy, metavalid_accuracy,
-   metatest_accuracy, val_input_op, val_pred_op, val_true_op) = construct_graph(outer_model_config)
+   metatest_accuracy, val_input_op, val_pred_op, val_true_op, metavalid_functions) = construct_graph(outer_model_config)
 
   num_steps_limit = outer_model_config["num_steps_limit"]
   best_metavalid_accuracy = 0.
@@ -196,6 +196,7 @@ def run_training_loop(checkpoint_path):
           print("val input {}".format(val_input))
           print("val pred {}".format(val_pred))
           print("val true {}".format(val_true))
+          print("metavalid functions: {}".format(metavalid_functions))
 
           tf.logging.info("Step: {} meta-valid MSE: {}".format(
               global_step_ev, metavalid_accuracy_ev))
