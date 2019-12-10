@@ -114,10 +114,15 @@ class LEO(snt.AbstractModule):
 
     #import pdb; pdb.set_trace()
     latents, kl = self.forward_encoder(data)
-    tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
-        data, latents)
-    val_loss, val_accuracy, val_input, val_pred, val_true = self.finetuning_inner_loop(
-        data, tr_loss, adapted_classifier_weights)
+    val_input, val_pred, val_true = [], [], []
+    for _ in range(5):
+        tr_loss, adapted_classifier_weights, encoder_penalty = self.leo_inner_loop(
+            data, latents)
+        val_loss, val_accuracy, val_input_entry, val_pred_entry, val_true_entry = self.finetuning_inner_loop(
+            data, tr_loss, adapted_classifier_weights)
+        val_input.append(val_input_entry)
+        val_pred.append(val_pred_entry)
+        val_true.append(val_true_entry)
 
     val_loss += self._kl_weight * kl
     val_loss += self._encoder_penalty_weight * encoder_penalty
