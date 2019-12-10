@@ -43,8 +43,8 @@ flags.DEFINE_integer(
     "steps in the parameter space).")
 flags.DEFINE_integer("num_latents", 64, "The dimensionality of the latent "
                      "space.")
-flags.DEFINE_float(
-    "inner_lr_init", 1.0, "The initialization value for the "
+flags.DEFINE_float(  # todo: was originally 1.0 
+    "inner_lr_init", 0.1, "The initialization value for the "
     "learning rate of the inner loop of leo.")
 flags.DEFINE_float(
     "finetuning_lr_init", 0.001, "The initialization value for "
@@ -73,11 +73,11 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     "num_val_examples_per_class", 15, "Number of validation samples per class "
     "in a task instance.")
-flags.DEFINE_integer("metatrain_batch_size", 2, "Number of problem instances "
+flags.DEFINE_integer("metatrain_batch_size", 1, "Number of problem instances "
                      "in a batch.")
-flags.DEFINE_integer("metavalid_batch_size", 2, "Number of meta-validation " # todo: this defines number of tasks
+flags.DEFINE_integer("metavalid_batch_size", 1, "Number of meta-validation " # todo: this defines number of tasks
                      "problem instances.")
-flags.DEFINE_integer("metatest_batch_size", 2, "Number of meta-testing "
+flags.DEFINE_integer("metatest_batch_size", 1, "Number of meta-testing "
                      "problem instances.")
 flags.DEFINE_integer("num_steps_limit", int(1e5), "Number of steps to train "
                      "for.")
@@ -98,7 +98,7 @@ def get_data_config():
   config["dataset_name"] = FLAGS.dataset_name
   config["embedding_crop"] = FLAGS.embedding_crop
   config["train_on_val"] = FLAGS.train_on_val
-  config["total_examples_per_class"] = 600
+  config["total_examples_per_class"] = 10
   return config
 
 

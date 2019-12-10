@@ -30,6 +30,7 @@ class DataProvider(object):
             task_ids = all_task_ids[80:90]
         else:
             task_ids = all_task_ids[90:]
+        task_ids = [task_id for task_id in task_ids if task_id % 2 == 1] # todo: only to sine or linear, not both at same time 
         return task_ids
 
     """
@@ -46,7 +47,7 @@ class DataProvider(object):
         all_task_ids = self.task_ids_for_split()
         sampled_task_ids = random.sample(all_task_ids, num_tasks)
         random.shuffle(sampled_task_ids)
-
+     #   print("{} {} {}".format(num_tasks, tr_size, val_size))
         X_list, Y_list, functions_list = [], [], []
         for task_id in sampled_task_ids:
             df_task = self.df_dataset[self.df_dataset.task_id == task_id]

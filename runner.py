@@ -197,7 +197,8 @@ def run_training_loop(checkpoint_path):
           print("val pred {}".format(val_pred))
           print("val true {}".format(val_true))
           print("metavalid functions: {}".format(metavalid_functions))
-
+         # print("val input shape {} functions len {}".format(val_input.shape, len(metavalid_functions)))
+          
           tf.logging.info("Step: {} meta-valid MSE: {}".format(
               global_step_ev, metavalid_accuracy_ev))
 
